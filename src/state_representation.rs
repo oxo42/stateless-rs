@@ -6,16 +6,17 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::FnOnce;
+use std::sync::{Arc, Mutex};
 
-type Action<S, T> = Box<dyn Fn(&Transition<S, T>)>;
+type Action<S, T, O> = Box<dyn FnMut(&Transition<S, T>, Arc<Mutex<O>>)>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct StateRepresentation<S, T> {
+pub struct StateRepresentation<S, T, O> {
     state: S,
     trigger_behaviours: HashMap<T, Box<dyn TriggerBehaviour<S, T>>>,
     #[derivative(Debug = "ignore")]
-    entry_actions: Vec<Action<S, T>>,
+    entry_actions: Vec<Action<S, T, O>>,
     // exit_actions: Vec<()>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
@@ -23,7 +24,7 @@ pub struct StateRepresentation<S, T> {
     // substates: Vec<Self>,
 }
 
-impl<S, T> StateRepresentation<S, T>
+impl<S, T, O> StateRepresentation<S, T, O>
 where
     S: Copy + Debug,
     T: Eq + Hash + Debug + Copy,
@@ -50,7 +51,7 @@ where
 
     pub fn add_entry_action<F>(&mut self, f: F)
     where
-        F: Fn(&Transition<S, T>) + 'static,
+        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
     {
         self.entry_actions.push(Box::new(f));
     }
@@ -65,13 +66,13 @@ where
         }
     }
 
-    pub fn enter(&self, transition: Transition<S, T>) {
-        for action in self.entry_actions.iter() {
-            action(&transition);
+    pub fn enter(&mut self, transition: Transition<S, T>, state_object: Arc<Mutex<O>>) {
+        for action in self.entry_actions.iter_mut() {
+            action(&transition, Arc::clone(&state_object));
         }
     }
 
-    pub(crate) fn entry_actions(&self) -> &Vec<Action<S, T>> {
+    pub(crate) fn entry_actions(&self) -> &Vec<Action<S, T, O>> {
         &self.entry_actions
     }
 }

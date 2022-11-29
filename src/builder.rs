@@ -5,6 +5,8 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::FnOnce;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -14,16 +16,16 @@ use crate::transition::Transition;
 use crate::trigger_behaviour::TransitioningTriggerBehaviour;
 use crate::StateMachineError;
 
-pub struct StateConfig<S, T> {
-    rep: Rc<RefCell<StateRepresentation<S, T>>>,
+pub struct StateConfig<S, T, O> {
+    rep: Rc<RefCell<StateRepresentation<S, T, O>>>,
 }
 
-impl<S, T> StateConfig<S, T>
+impl<S, T, O> StateConfig<S, T, O>
 where
     S: Debug + Copy + Eq + Hash + 'static,
     T: Debug + Copy + Eq + Hash + 'static,
 {
-    fn new(rep: Rc<RefCell<StateRepresentation<S, T>>>) -> Self {
+    fn new(rep: Rc<RefCell<StateRepresentation<S, T, O>>>) -> Self {
         Self { rep }
     }
 
@@ -41,7 +43,7 @@ where
 
     pub fn on_entry<F>(self, f: F) -> Self
     where
-        F: Fn(&Transition<S, T>) + 'static,
+        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
     {
         self.rep.borrow_mut().add_entry_action(f);
         self
@@ -55,18 +57,19 @@ fn unwrap_rc_and_refcell<R>(item: Rc<RefCell<R>>) -> Result<R, Rc<RefCell<R>>> {
 }
 
 #[derive(Debug)]
-pub struct StateMachineBuilder<S, T> {
+pub struct StateMachineBuilder<S, T, O> {
     initial_state: S,
-    states: HashMap<S, Rc<RefCell<StateRepresentation<S, T>>>>,
+    states: HashMap<S, Rc<RefCell<StateRepresentation<S, T, O>>>>,
 }
 
-impl<S, T> StateMachineBuilder<S, T>
+impl<S, T, O> StateMachineBuilder<S, T, O>
 where
     S: IntoEnumIterator + Debug + Copy + Eq + Hash + 'static,
     T: Debug + Copy + Eq + Hash + 'static,
+    O: Debug,
 {
     pub fn new(initial_state: S) -> Self {
-        let states: HashMap<S, Rc<RefCell<StateRepresentation<S, T>>>> = S::iter()
+        let states: HashMap<S, Rc<RefCell<StateRepresentation<S, T, O>>>> = S::iter()
             .map(|state| {
                 (
                     state,
@@ -80,7 +83,7 @@ where
         }
     }
 
-    pub fn config(&mut self, state: S) -> StateConfig<S, T> {
+    pub fn config(&mut self, state: S) -> StateConfig<S, T, O> {
         let representation = self
             .states
             .get(&state)
@@ -88,9 +91,27 @@ where
         StateConfig::new(Rc::clone(representation))
     }
 
-    pub fn build(self) -> Result<StateMachine<S, T>, StateMachineError<S, T>> {
+    /// Will consume the `StateMachineBuilder` and return a `StateMachine`.  The
+    /// `state_object` will be wrapped in a `Arc<Mutex<O>>` and you can pull it
+    /// out with
+    /// ```
+    /// # use stateless_rs::StateMachineBuilder;
+    /// # #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, strum_macros::EnumIter)]
+    /// # enum State { On }
+    /// # #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+    /// # enum Trigger {
+    /// # }
+    /// # fn main() -> Result<(), stateless_rs::StateMachineError<State,Trigger>> {
+    /// let object = 42;
+    /// let mut builder = StateMachineBuilder::<State, Trigger, i32>::new(State::On);
+    /// let machine = builder.build(object)?;
+    /// let object = machine.object(); // Returns Arc<Mutex<i32>>
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn build(self, state_object: O) -> Result<StateMachine<S, T, O>, StateMachineError<S, T>> {
         // StateMachine::new(self.initial_state, self.states)
-        let state_reps: Result<HashMap<S, StateRepresentation<S, T>>, _> = self
+        let state_reps: Result<HashMap<S, StateRepresentation<S, T, O>>, _> = self
             .states
             .into_iter()
             .map(|(state, rc_ref_rep)| {
@@ -101,7 +122,11 @@ where
                     })
             })
             .collect();
-        Ok(StateMachine::new(self.initial_state, state_reps?))
+        Ok(StateMachine::new(
+            self.initial_state,
+            state_reps?,
+            Arc::new(Mutex::new(state_object)),
+        ))
     }
 }
 
@@ -122,7 +147,7 @@ mod tests {
 
     #[test]
     fn check_all_states_are_configured_on_new() {
-        let builder = StateMachineBuilder::<State, Trigger>::new(State::State1);
+        let builder = StateMachineBuilder::<State, Trigger, ()>::new(State::State1);
         assert_eq!(builder.states.len(), State::iter().count());
         assert!(State::iter().all(|s| builder.states.contains_key(&s)));
     }
@@ -139,15 +164,15 @@ mod tests {
 
         assert_eq!(builder.states.len(), 2);
 
-        let _machine = builder.build();
+        let _machine = builder.build(());
     }
 
     #[test]
     fn test_builder_on_entry_adds_to_state_representation() -> eyre::Result<()> {
-        let mut builder = StateMachineBuilder::<State, Trigger>::new(State::State1);
+        let mut builder = StateMachineBuilder::<State, Trigger, ()>::new(State::State1);
         builder
             .config(State::State1)
-            .on_entry(|_t| println!("foobar"));
+            .on_entry(|_t, _o| println!("foobar"));
 
         let rep = builder.states[&State::State1].borrow();
         assert_eq!(rep.entry_actions().len(), 1);

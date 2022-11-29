@@ -20,7 +20,7 @@ fn main() -> eyre::Result<()> {
     builder
         .config(State::On)
         .permit(Trigger::Switch, State::Off);
-    let mut machine = builder.build()?;
+    let mut machine = builder.build(())?;
 
     println!("Machine: {}", machine);
     println!("Hitting switch");

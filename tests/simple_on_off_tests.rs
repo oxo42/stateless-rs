@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use stateless_rs::StateMachineBuilder;
 use strum_macros::EnumIter;
 
@@ -21,7 +23,7 @@ fn check_simple_machine_builds_and_works() -> eyre::Result<()> {
     builder
         .config(State::On)
         .permit(Trigger::Switch, State::Off);
-    let mut machine = builder.build()?;
+    let mut machine = builder.build(Arc::new(Mutex::new(())))?;
 
     assert_eq!(machine.state(), State::Off);
     machine.fire(Trigger::Switch)?;

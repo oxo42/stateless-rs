@@ -28,7 +28,7 @@ enum State {
     PhoneDestroyed,
 }
 
-fn build_statemachine() -> eyre::Result<StateMachine<State, Trigger>> {
+fn build_statemachine() -> eyre::Result<StateMachine<State, Trigger, ()>> {
     // the commented lines are things I need to do to get feature parity with
     // https://github.com/dotnet-state-machine/stateless
     let mut builder = StateMachineBuilder::new(State::OffHook);
@@ -67,7 +67,7 @@ fn build_statemachine() -> eyre::Result<StateMachine<State, Trigger>> {
     //     )
     // });
 
-    let machine = builder.build()?;
+    let machine = builder.build(())?;
     Ok(machine)
 }
 
