@@ -16,9 +16,11 @@ fn main() -> eyre::Result<()> {
     let mut builder = StateMachineBuilder::new(State::Off);
     builder
         .config(State::Off)
+        .on_entry(|_, _| println!("Turning off"))
         .permit(Trigger::Switch, State::On);
     builder
         .config(State::On)
+        .on_entry(|_, _| println!("Turning on"))
         .permit(Trigger::Switch, State::Off);
     let mut machine = builder.build(())?;
 

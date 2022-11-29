@@ -16,7 +16,9 @@ pub struct StateRepresentation<S, T, O> {
     state: S,
     trigger_behaviours: HashMap<T, Box<dyn TriggerBehaviour<S, T>>>,
     #[derivative(Debug = "ignore")]
-    entry_actions: Vec<Action<S, T, O>>,
+    pub(crate) entry_actions: Vec<Action<S, T, O>>,
+    #[derivative(Debug = "ignore")]
+    pub(crate) exit_actions: Vec<Action<S, T, O>>,
     // exit_actions: Vec<()>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
@@ -34,6 +36,7 @@ where
             state,
             trigger_behaviours: HashMap::new(),
             entry_actions: Vec::new(),
+            exit_actions: Vec::new(),
         }
     }
 
@@ -56,6 +59,13 @@ where
         self.entry_actions.push(Box::new(f));
     }
 
+    pub fn add_exit_action<F>(&mut self, f: F)
+    where
+        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+    {
+        self.exit_actions.push(Box::new(f));
+    }
+
     pub fn fire_trigger(&self, trigger: T) -> Result<S, StateMachineError<S, T>> {
         match self.trigger_behaviours.get(&trigger) {
             Some(b) => Ok(b.fire(self.state)),
@@ -72,7 +82,9 @@ where
         }
     }
 
-    pub(crate) fn entry_actions(&self) -> &Vec<Action<S, T, O>> {
-        &self.entry_actions
+    pub fn exit(&mut self, transition: Transition<S, T>, state_object: Arc<Mutex<O>>) {
+        for action in self.exit_actions.iter_mut() {
+            action(&transition, Arc::clone(&state_object));
+        }
     }
 }

@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Transition<S, T> {
     pub source: S,
     pub destination: S,

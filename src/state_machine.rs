@@ -52,24 +52,24 @@ where
     }
 
     fn fireone(&mut self, trigger: T) -> Result<(), StateMachineError<S, T>> {
+        let state_object = Arc::clone(&self.object);
+        let current_state = self.current_state;
+
         let representation = self
             .representation()
             .expect("representations should all exist");
-
         let destination = representation.fire_trigger(trigger)?;
-        let transition = Transition::new(self.current_state, trigger, destination);
+        let transition = Transition::new(current_state, trigger, destination);
 
-        // representation.exit(transition);
+        representation.exit(transition.clone(), Arc::clone(&state_object));
 
         self.current_state = transition.destination;
-
-        let state_object = Arc::clone(&self.object);
 
         let new_representation = self
             .representation()
             .expect("representations should all exist");
         // TODO: invoke on transitioned event
-        new_representation.enter(transition, state_object);
+        new_representation.enter(transition.clone(), state_object);
         Ok(())
     }
 }
@@ -167,7 +167,6 @@ mod tests {
         builder
             .config(State::Off)
             .permit(Trigger::Switch, State::On);
-        // TODO this is too hard
         builder
             .config(State::On)
             .on_entry(move |_transition, object| {
@@ -178,6 +177,32 @@ mod tests {
                 let mut data = object.lock().unwrap();
                 *data += 2;
             });
+
+        let mut machine = builder.build(0)?;
+
+        let count = machine.object();
+
+        assert_eq!(machine.state(), State::Off);
+        machine.fire(Trigger::Switch)?;
+        assert_eq!(machine.state(), State::On);
+        assert_eq!(*count.lock().unwrap(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn statemachine_on_exit_fires_multiple_actions() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::new(State::Off);
+        builder
+            .config(State::Off)
+            .on_exit(move |_transition, object| {
+                let mut data = object.lock().unwrap();
+                *data += 1;
+            })
+            .on_exit(move |_transition, object| {
+                let mut data = object.lock().unwrap();
+                *data += 2;
+            })
+            .permit(Trigger::Switch, State::On);
 
         let mut machine = builder.build(0)?;
 

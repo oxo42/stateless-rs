@@ -50,6 +50,14 @@ where
         self.rep.borrow_mut().add_entry_action(f);
         self
     }
+
+    pub fn on_exit<F>(self, f: F) -> Self
+    where
+        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+    {
+        self.rep.borrow_mut().add_exit_action(f);
+        self
+    }
 }
 
 fn unwrap_rc_and_refcell<R>(item: Rc<RefCell<R>>) -> Result<R, Rc<RefCell<R>>> {
@@ -177,7 +185,19 @@ mod tests {
             .on_entry(|_t, _o| println!("foobar"));
 
         let rep = builder.states[&State::State1].borrow();
-        assert_eq!(rep.entry_actions().len(), 1);
+        assert_eq!(rep.entry_actions.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_builder_on_exit_adds_to_state_representation() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::<State, Trigger, ()>::new(State::State1);
+        builder
+            .config(State::State1)
+            .on_exit(|_t, _o| println!("foobar"));
+
+        let rep = builder.states[&State::State1].borrow();
+        assert_eq!(rep.exit_actions.len(), 1);
         Ok(())
     }
 }
