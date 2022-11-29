@@ -9,4 +9,5 @@ edition = "2021"
 thiserror = "1.0.37"
 
 [dev-dependencies]
-anyhow = "1.0.66"
+color-eyre = "0.6.2"
+eyre = "0.6.8"

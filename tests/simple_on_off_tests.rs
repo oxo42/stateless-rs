@@ -11,7 +11,8 @@ enum Trigger {
     Switch,
 }
 
-fn main() -> eyre::Result<()> {
+#[test]
+fn check_simple_machine_builds_and_works() -> eyre::Result<()> {
     let mut builder = StateMachineBuilder::new(State::Off);
     builder
         .config(State::Off)
@@ -21,12 +22,10 @@ fn main() -> eyre::Result<()> {
         .permit(Trigger::Switch, State::Off);
     let mut machine = builder.build()?;
 
-    println!("Machine: {}", machine);
-    println!("Hitting switch");
+    assert_eq!(machine.state(), State::Off);
     machine.fire(Trigger::Switch)?;
-    println!("Machine: {}", machine);
-    println!("Hitting switch");
+    assert_eq!(machine.state(), State::On);
     machine.fire(Trigger::Switch)?;
-    println!("Machine: {}", machine);
+    assert_eq!(machine.state(), State::Off);
     Ok(())
 }

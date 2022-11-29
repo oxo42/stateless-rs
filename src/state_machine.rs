@@ -37,7 +37,7 @@ where
         }
     }
 
-    fn state(&self) -> S {
+    pub fn state(&self) -> S {
         self.current_state
     }
 
@@ -104,7 +104,7 @@ mod tests {
     }
 
     #[test]
-    fn foo() -> anyhow::Result<()> {
+    fn foo() -> eyre::Result<()> {
         let mut builder = StateMachineBuilder::new(State::OffHook);
         builder
             .config(State::OffHook)
@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn fire_for_not_defined_throws_error() -> anyhow::Result<()> {
+    fn fire_for_not_defined_throws_error() -> eyre::Result<()> {
         let mut machine = StateMachineBuilder::new(State::OffHook).build()?;
         let result = machine.fire(Trigger::CallDialed);
         assert!(result.is_err());
