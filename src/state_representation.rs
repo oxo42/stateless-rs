@@ -1,15 +1,21 @@
+use crate::transition::Transition;
+use crate::trigger_behaviour::TriggerBehaviour;
+use crate::StateMachineError;
+use derivative::Derivative;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::ops::FnOnce;
 
-use crate::trigger_behaviour::TriggerBehaviour;
-use crate::StateMachineError;
+type Action<S, T> = Box<dyn Fn(&Transition<S, T>)>;
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct StateRepresentation<S, T> {
     state: S,
     trigger_behaviours: HashMap<T, Box<dyn TriggerBehaviour<S, T>>>,
-    // entry_actions: Vec<()>,
+    #[derivative(Debug = "ignore")]
+    entry_actions: Vec<Action<S, T>>,
     // exit_actions: Vec<()>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
@@ -26,6 +32,7 @@ where
         Self {
             state,
             trigger_behaviours: HashMap::new(),
+            entry_actions: Vec::new(),
         }
     }
 
@@ -41,6 +48,13 @@ where
         self.trigger_behaviours.insert(trigger, Box::new(behaviour));
     }
 
+    pub fn add_entry_action<F>(&mut self, f: F)
+    where
+        F: Fn(&Transition<S, T>) + 'static,
+    {
+        self.entry_actions.push(Box::new(f));
+    }
+
     pub fn fire_trigger(&self, trigger: T) -> Result<S, StateMachineError<S, T>> {
         match self.trigger_behaviours.get(&trigger) {
             Some(b) => Ok(b.fire(self.state)),
@@ -49,5 +63,15 @@ where
                 trigger,
             }),
         }
+    }
+
+    pub fn enter(&self, transition: Transition<S, T>) {
+        for action in self.entry_actions.iter() {
+            action(&transition);
+        }
+    }
+
+    pub(crate) fn entry_actions(&self) -> &Vec<Action<S, T>> {
+        &self.entry_actions
     }
 }

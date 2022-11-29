@@ -1,6 +1,7 @@
 use stateless_rs::StateMachineBuilder;
+use strum_macros::EnumIter;
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, EnumIter)]
 enum State {
     On,
     Off,

@@ -13,7 +13,7 @@ pub use state_machine::StateMachine;
 use std::fmt::Debug;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum StateMachineError<S, T> {
     #[error("state {state:?} not configured")]
     StateNotConfigured { state: S },
