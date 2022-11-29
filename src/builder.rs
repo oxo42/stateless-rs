@@ -16,8 +16,10 @@ use crate::transition::Transition;
 use crate::trigger_behaviour::TransitioningTriggerBehaviour;
 use crate::StateMachineError;
 
+type WrappedStateRep<S, T, O> = Rc<RefCell<StateRepresentation<S, T, O>>>;
+
 pub struct StateConfig<S, T, O> {
-    rep: Rc<RefCell<StateRepresentation<S, T, O>>>,
+    rep: WrappedStateRep<S, T, O>,
 }
 
 impl<S, T, O> StateConfig<S, T, O>
@@ -25,7 +27,7 @@ where
     S: Debug + Copy + Eq + Hash + 'static,
     T: Debug + Copy + Eq + Hash + 'static,
 {
-    fn new(rep: Rc<RefCell<StateRepresentation<S, T, O>>>) -> Self {
+    fn new(rep: WrappedStateRep<S, T, O>) -> Self {
         Self { rep }
     }
 
@@ -59,7 +61,7 @@ fn unwrap_rc_and_refcell<R>(item: Rc<RefCell<R>>) -> Result<R, Rc<RefCell<R>>> {
 #[derive(Debug)]
 pub struct StateMachineBuilder<S, T, O> {
     initial_state: S,
-    states: HashMap<S, Rc<RefCell<StateRepresentation<S, T, O>>>>,
+    states: HashMap<S, WrappedStateRep<S, T, O>>,
 }
 
 impl<S, T, O> StateMachineBuilder<S, T, O>
@@ -69,7 +71,7 @@ where
     O: Debug,
 {
     pub fn new(initial_state: S) -> Self {
-        let states: HashMap<S, Rc<RefCell<StateRepresentation<S, T, O>>>> = S::iter()
+        let states: HashMap<S, WrappedStateRep<S, T, O>> = S::iter()
             .map(|state| {
                 (
                     state,

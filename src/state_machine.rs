@@ -144,22 +144,20 @@ mod tests {
 
     #[test]
     fn statemachine_on_entry_fires() -> eyre::Result<()> {
-        let fired = Rc::new(RefCell::new(false));
-        let fired_clone = Rc::clone(&fired);
         let mut builder = StateMachineBuilder::new(State::Off);
         builder
             .config(State::Off)
             .permit(Trigger::Switch, State::On);
         builder
             .config(State::On)
-            .on_entry(move |_transition, _obj| *fired_clone.borrow_mut() = true);
+            .on_entry(move |_transition, obj| *obj.lock().unwrap() = true);
 
-        let mut machine = builder.build(())?;
+        let mut machine = builder.build(false)?;
 
         assert_eq!(machine.state(), State::Off);
         machine.fire(Trigger::Switch)?;
         assert_eq!(machine.state(), State::On);
-        assert!(*fired.borrow());
+        assert!(*machine.object().lock().unwrap());
         Ok(())
     }
 
