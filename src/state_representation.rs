@@ -19,7 +19,6 @@ pub struct StateRepresentation<S, T, O> {
     pub(crate) entry_actions: Vec<Action<S, T, O>>,
     #[derivative(Debug = "ignore")]
     pub(crate) exit_actions: Vec<Action<S, T, O>>,
-    // exit_actions: Vec<()>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
     // internal_actions: Vec<()>,
