@@ -8,6 +8,8 @@ use std::sync::Mutex;
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
 use crate::transition_event;
+use crate::trigger_behaviour::TrigBehaviour;
+use crate::trigger_behaviour::TriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
 
@@ -60,25 +62,42 @@ where
         let state_object = Arc::clone(&self.object);
         let current_state = self.current_state;
 
-        let transition = {
+        let behaviour = {
             let representation = self
                 .representation()
                 .expect("representations should all exist");
-            let destination = representation.fire_trigger(trigger)?;
-            let transition = Transition::new(current_state, trigger, destination);
-            representation.exit(&transition, Arc::clone(&state_object));
-            transition
+            let behaviour = representation.get_behaviour(trigger)?;
+            behaviour
+        };
+        let transition = match behaviour {
+            TrigBehaviour::Transitioning(b) => {
+                let representation = self
+                    .representation()
+                    .expect("representations should all exist");
+                let destination = b.fire(current_state);
+                let transition = Transition::new(current_state, trigger, destination);
+                representation.exit(&transition, Arc::clone(&state_object));
+                self.current_state = transition.destination;
+                let representation = self
+                    .representation()
+                    .expect("representations should all exist");
+                representation.enter(&transition, state_object);
+                transition
+            }
+            TrigBehaviour::Internal(b) => {
+                b.fire(current_state); // TODO: does nothing now. Maybe needed for parameters
+                let representation = self
+                    .representation()
+                    .expect("representations should all exist");
+                let transition = Transition::new(current_state, trigger, current_state);
+                representation.fire_internal_actions(&transition, Arc::clone(&state_object));
+                transition
+
+            }
         };
 
-        self.current_state = transition.destination;
         self.transition_event.fire_events(&transition);
 
-        {
-            let representation = self
-                .representation()
-                .expect("representations should all exist");
-            representation.enter(&transition, state_object);
-        }
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use crate::transition::Transition;
-use crate::trigger_behaviour::TriggerBehaviour;
+use crate::trigger_behaviour::{TrigBehaviour, TriggerBehaviour};
 use crate::StateMachineError;
 use derivative::Derivative;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ type Action<S, T, O> = Box<dyn FnMut(&Transition<S, T>, &mut O)>;
 #[derivative(Debug)]
 pub struct StateRepresentation<S, T, O> {
     state: S,
-    trigger_behaviours: HashMap<T, Box<dyn TriggerBehaviour<S, T>>>,
+    trigger_behaviours: HashMap<T, TrigBehaviour<S, T>>,
     #[derivative(Debug = "ignore")]
     pub(crate) entry_actions: Vec<Action<S, T, O>>,
     #[derivative(Debug = "ignore")]
@@ -45,12 +45,8 @@ where
         self.state
     }
 
-    pub fn add_trigger_behaviour(
-        &mut self,
-        trigger: T,
-        behaviour: impl TriggerBehaviour<S, T> + 'static,
-    ) {
-        self.trigger_behaviours.insert(trigger, Box::new(behaviour));
+    pub(crate) fn add_trigger_behaviour(&mut self, trigger: T, behaviour: TrigBehaviour<S, T>) {
+        self.trigger_behaviours.insert(trigger, behaviour);
     }
 
     pub fn add_entry_action<F>(&mut self, f: F)
@@ -74,14 +70,17 @@ where
         self.internal_actions.push(Box::new(f));
     }
 
-    pub fn fire_trigger(&self, trigger: T) -> Result<S, StateMachineError<S, T>> {
-        let Some(behaviour) = self.trigger_behaviours.get(&trigger) else {
-            return Err(StateMachineError::TriggerNotPermitted {
+    pub(crate) fn get_behaviour(
+        &self,
+        trigger: T,
+    ) -> Result<TrigBehaviour<S, T>, StateMachineError<S, T>> {
+        let b = self.trigger_behaviours.get(&trigger).ok_or_else(|| {
+            StateMachineError::TriggerNotPermitted {
                 state: self.state,
                 trigger,
-            });
-        };
-        Ok(behaviour.fire(self.state))
+            }
+        })?;
+        Ok(b.clone())
     }
 
     pub fn enter(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
@@ -97,6 +96,17 @@ where
             action(transition, &mut *object);
         }
     }
+
+    pub fn fire_internal_actions(
+        &mut self,
+        transition: &Transition<S, T>,
+        state_object: Arc<Mutex<O>>,
+    ) {
+        for action in self.internal_actions.iter_mut() {
+            let mut object = state_object.lock().unwrap();
+            action(transition, &mut *object);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -107,7 +117,7 @@ mod tests {
     #[test]
     fn unconfigured_trigger_errors() {
         let rep = StateRepresentation::<_, _, ()>::new(State::State1);
-        let result = rep.fire_trigger(Trigger::Trig);
+        let result = rep.get_behaviour(Trigger::Trig);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),

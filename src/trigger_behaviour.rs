@@ -1,5 +1,11 @@
 use std::{fmt::Debug, marker::PhantomData};
 
+#[derive(Debug, Clone)]
+pub(crate) enum TrigBehaviour<S, T> {
+    Transitioning(TransitioningTriggerBehaviour<S, T>),
+    Internal(InternalTransitioningTriggerBehaviour<S, T>),
+}
+
 pub trait TriggerBehaviour<S, T>: Debug
 where
     S: Copy + Debug,
@@ -9,7 +15,7 @@ where
     fn fire(&self, source: S) -> S;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransitioningTriggerBehaviour<S, T> {
     trigger: T,
     destination: S,
@@ -34,7 +40,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InternalTransitioningTriggerBehaviour<S, T> {
     trigger: T,
     phantom: PhantomData<S>,
