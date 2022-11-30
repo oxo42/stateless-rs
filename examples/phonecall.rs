@@ -50,11 +50,11 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
 
     builder
         .config(State::Connected)
-        .on_entry(|_trigger, object| {
+        .on_entry(|_transition, object| {
             let mut data: MutexGuard<'_, PhoneState> = object.lock().unwrap();
             (*data).call_start = Some(Instant::now());
         })
-        .on_exit(|_trigger, object| {
+        .on_exit(|_transition, object| {
             let mut data: MutexGuard<'_, PhoneState> = object.lock().unwrap();
             let call_start = (*data).call_start.unwrap();
             let duration = Instant::now().duration_since(call_start);
