@@ -72,15 +72,13 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
         .permit(Trigger::TakenOffHold, State::Connected)
         .permit(Trigger::PhoneHurledAgainstWall, State::PhoneDestroyed);
 
-    // builder.on_transitioned(|t| {
-    //     println!(
-    //         "on_transitioned: {} -> {} via {}({})",
-    //         t.source,
-    //         t.destination,
-    //         t.trigger,
-    //         join(t.parameters)
-    //     )
-    // });
+    builder.on_transitioned(|t| {
+        // TODO: parameters
+        println!(
+            "on_transitioned: {:?} -> {:?} via {:?}",
+            t.source, t.destination, t.trigger
+        )
+    });
 
     let machine = builder.build(state)?;
     Ok(machine)

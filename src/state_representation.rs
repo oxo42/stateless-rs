@@ -75,15 +75,15 @@ where
         }
     }
 
-    pub fn enter(&mut self, transition: Transition<S, T>, state_object: Arc<Mutex<O>>) {
+    pub fn enter(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
         for action in self.entry_actions.iter_mut() {
-            action(&transition, Arc::clone(&state_object));
+            action(transition, Arc::clone(&state_object));
         }
     }
 
-    pub fn exit(&mut self, transition: Transition<S, T>, state_object: Arc<Mutex<O>>) {
+    pub fn exit(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
         for action in self.exit_actions.iter_mut() {
-            action(&transition, Arc::clone(&state_object));
+            action(transition, Arc::clone(&state_object));
         }
     }
 }

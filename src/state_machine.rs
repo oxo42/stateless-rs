@@ -7,13 +7,16 @@ use std::sync::Mutex;
 
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
+use crate::transition_event;
 use crate::StateMachineError;
+use crate::TransitionEventHandler;
 
 #[derive(Debug)]
 pub struct StateMachine<S, T, O> {
     current_state: S,
     state_representations: HashMap<S, StateRepresentation<S, T, O>>,
     object: Arc<Mutex<O>>,
+    transition_event: TransitionEventHandler<S, T>,
 }
 
 impl<S, T, O> StateMachine<S, T, O>
@@ -27,11 +30,13 @@ where
         initial_state: S,
         state_representations: HashMap<S, StateRepresentation<S, T, O>>,
         object: Arc<Mutex<O>>,
+        transition_event: TransitionEventHandler<S, T>,
     ) -> Self {
         Self {
             current_state: initial_state,
             state_representations,
             object,
+            transition_event,
         }
     }
 
@@ -55,21 +60,25 @@ where
         let state_object = Arc::clone(&self.object);
         let current_state = self.current_state;
 
-        let representation = self
-            .representation()
-            .expect("representations should all exist");
-        let destination = representation.fire_trigger(trigger)?;
-        let transition = Transition::new(current_state, trigger, destination);
-
-        representation.exit(transition.clone(), Arc::clone(&state_object));
+        let transition = {
+            let representation = self
+                .representation()
+                .expect("representations should all exist");
+            let destination = representation.fire_trigger(trigger)?;
+            let transition = Transition::new(current_state, trigger, destination);
+            representation.exit(&transition, Arc::clone(&state_object));
+            transition
+        };
 
         self.current_state = transition.destination;
+        self.transition_event.fire_events(&transition);
 
-        let new_representation = self
-            .representation()
-            .expect("representations should all exist");
-        // TODO: invoke on transitioned event
-        new_representation.enter(transition.clone(), state_object);
+        {
+            let representation = self
+                .representation()
+                .expect("representations should all exist");
+            representation.enter(&transition, state_object);
+        }
         Ok(())
     }
 }
@@ -212,6 +221,28 @@ mod tests {
         machine.fire(Trigger::Switch)?;
         assert_eq!(machine.state(), State::On);
         assert_eq!(*count.lock().unwrap(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn transitioned_event_happens_on_transition() -> eyre::Result<()> {
+        let count = Arc::new(Mutex::new(0));
+        let count1 = Arc::clone(&count);
+
+        let mut builder = StateMachineBuilder::new(State::Off);
+        builder
+            .config(State::Off)
+            .permit(Trigger::Switch, State::On);
+
+        builder.on_transitioned(move |_t| {
+            let mut data = count1.lock().unwrap();
+            *data += 1
+        });
+
+        let mut machine = builder.build(())?;
+        machine.fire(Trigger::Switch)?;
+
+        assert_eq!(*count.lock().unwrap(), 1);
         Ok(())
     }
 }

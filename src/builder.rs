@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -15,6 +16,7 @@ use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
 use crate::trigger_behaviour::TransitioningTriggerBehaviour;
 use crate::StateMachineError;
+use crate::TransitionEventHandler;
 
 type WrappedStateRep<S, T, O> = Rc<RefCell<StateRepresentation<S, T, O>>>;
 
@@ -70,6 +72,7 @@ fn unwrap_rc_and_refcell<R>(item: Rc<RefCell<R>>) -> Result<R, Rc<RefCell<R>>> {
 pub struct StateMachineBuilder<S, T, O> {
     initial_state: S,
     states: HashMap<S, WrappedStateRep<S, T, O>>,
+    transition_event: TransitionEventHandler<S, T>,
 }
 
 impl<S, T, O> StateMachineBuilder<S, T, O>
@@ -90,6 +93,7 @@ where
         StateMachineBuilder {
             initial_state,
             states,
+            transition_event: TransitionEventHandler::new(),
         }
     }
 
@@ -99,6 +103,13 @@ where
             .get(&state)
             .expect("all states to have been created in constructor");
         StateConfig::new(Rc::clone(representation))
+    }
+
+    pub fn on_transitioned<F>(&mut self, f: F)
+    where
+        F: FnMut(&Transition<S, T>) + 'static,
+    {
+        self.transition_event.add_event(f);
     }
 
     /// Will consume the `StateMachineBuilder` and return a `StateMachine`.  The
@@ -136,6 +147,7 @@ where
             self.initial_state,
             state_reps?,
             Arc::new(Mutex::new(state_object)),
+            self.transition_event,
         ))
     }
 }
@@ -198,6 +210,16 @@ mod tests {
 
         let rep = builder.states[&State::State1].borrow();
         assert_eq!(rep.exit_actions.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn on_transition_twice_adds_two_events() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::<State, Trigger, ()>::new(State::State1);
+        builder.on_transitioned(|_t| ());
+        builder.on_transitioned(|_t| ());
+        assert_eq!(builder.transition_event.events.len(), 2);
+
         Ok(())
     }
 }
