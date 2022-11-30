@@ -99,53 +99,37 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
-
-    use strum_macros::EnumIter;
-
-    use crate::StateMachineBuilder;
-
     use super::*;
-
-    #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-    enum Trigger {
-        Switch,
-        Bloop,
-    }
-
-    #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, EnumIter)]
-    enum State {
-        On,
-        Off,
-    }
+    use crate::tests::{State, Trigger};
+    use crate::StateMachineBuilder;
 
     #[test]
     fn entry_into_unconfigured_state_works() -> eyre::Result<()> {
         // If the user hasn't explicitly configured a state to do something, it
         // is still part of the State enum and is a valid destination
-        let mut builder = StateMachineBuilder::new(State::Off);
+        let mut builder = StateMachineBuilder::new(State::State1);
         builder
-            .config(State::Off)
-            .permit(Trigger::Switch, State::On);
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
         let mut machine = builder.build(())?;
 
-        assert_eq!(machine.state(), State::Off);
-        let result = machine.fire(Trigger::Switch)?;
-        assert_eq!(machine.state(), State::On);
+        assert_eq!(machine.state(), State::State1);
+        let result = machine.fire(Trigger::Trig)?;
+        assert_eq!(machine.state(), State::State2);
         Ok(())
     }
 
     #[test]
     fn fire_for_not_defined_throws_error() -> eyre::Result<()> {
-        let mut machine = StateMachineBuilder::new(State::On).build(())?;
-        let result = machine.fire(Trigger::Switch);
+        let mut machine = StateMachineBuilder::new(State::State2).build(())?;
+        let result = machine.fire(Trigger::Trig);
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert_eq!(
             error,
             StateMachineError::TriggerNotPermitted {
-                state: State::On,
-                trigger: Trigger::Switch
+                state: State::State2,
+                trigger: Trigger::Trig
             }
         );
         Ok(())
@@ -153,31 +137,31 @@ mod tests {
 
     #[test]
     fn statemachine_on_entry_fires() -> eyre::Result<()> {
-        let mut builder = StateMachineBuilder::new(State::Off);
+        let mut builder = StateMachineBuilder::new(State::State1);
         builder
-            .config(State::Off)
-            .permit(Trigger::Switch, State::On);
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
         builder
-            .config(State::On)
+            .config(State::State2)
             .on_entry(move |_transition, obj| *obj = true);
 
         let mut machine = builder.build(false)?;
 
-        assert_eq!(machine.state(), State::Off);
-        machine.fire(Trigger::Switch)?;
-        assert_eq!(machine.state(), State::On);
+        assert_eq!(machine.state(), State::State1);
+        machine.fire(Trigger::Trig)?;
+        assert_eq!(machine.state(), State::State2);
         assert!(*machine.object().lock().unwrap());
         Ok(())
     }
 
     #[test]
     fn statemachine_on_entry_fires_multiple_actions() -> eyre::Result<()> {
-        let mut builder = StateMachineBuilder::new(State::Off);
+        let mut builder = StateMachineBuilder::new(State::State1);
         builder
-            .config(State::Off)
-            .permit(Trigger::Switch, State::On);
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
         builder
-            .config(State::On)
+            .config(State::State2)
             .on_entry(move |_transition, object| {
                 *object += 1;
             })
@@ -189,33 +173,33 @@ mod tests {
 
         let count = machine.object();
 
-        assert_eq!(machine.state(), State::Off);
-        machine.fire(Trigger::Switch)?;
-        assert_eq!(machine.state(), State::On);
+        assert_eq!(machine.state(), State::State1);
+        machine.fire(Trigger::Trig)?;
+        assert_eq!(machine.state(), State::State2);
         assert_eq!(*count.lock().unwrap(), 3);
         Ok(())
     }
 
     #[test]
     fn statemachine_on_exit_fires_multiple_actions() -> eyre::Result<()> {
-        let mut builder = StateMachineBuilder::new(State::Off);
+        let mut builder = StateMachineBuilder::new(State::State1);
         builder
-            .config(State::Off)
+            .config(State::State1)
             .on_exit(move |_transition, object| {
                 *object += 1;
             })
             .on_exit(move |_transition, object| {
                 *object += 2;
             })
-            .permit(Trigger::Switch, State::On);
+            .permit(Trigger::Trig, State::State2);
 
         let mut machine = builder.build(0)?;
 
         let count = machine.object();
 
-        assert_eq!(machine.state(), State::Off);
-        machine.fire(Trigger::Switch)?;
-        assert_eq!(machine.state(), State::On);
+        assert_eq!(machine.state(), State::State1);
+        machine.fire(Trigger::Trig)?;
+        assert_eq!(machine.state(), State::State2);
         assert_eq!(*count.lock().unwrap(), 3);
         Ok(())
     }
@@ -225,10 +209,10 @@ mod tests {
         let count = Arc::new(Mutex::new(0));
         let count1 = Arc::clone(&count);
 
-        let mut builder = StateMachineBuilder::new(State::Off);
+        let mut builder = StateMachineBuilder::new(State::State1);
         builder
-            .config(State::Off)
-            .permit(Trigger::Switch, State::On);
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
 
         builder.on_transitioned(move |_t| {
             let mut data = count1.lock().unwrap();
@@ -236,9 +220,66 @@ mod tests {
         });
 
         let mut machine = builder.build(())?;
-        machine.fire(Trigger::Switch)?;
+        machine.fire(Trigger::Trig)?;
 
         assert_eq!(*count.lock().unwrap(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn internal_transition_fires() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::<_, _, i32>::new(State::State1);
+        builder
+            .config(State::State1)
+            .internal_transition(Trigger::Trig, |_t, o| *o += 1);
+
+        let mut machine = builder.build(0)?;
+        machine.fire(Trigger::Trig)?;
+
+        assert_eq!(*machine.object().lock().unwrap(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn internal_transition_does_not_fire_on_entry() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::<_, _, i32>::new(State::State1);
+        builder
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
+
+        builder
+            .config(State::State2)
+            .internal_transition(Trigger::Trig, |_t, o| *o += 1);
+
+        let mut machine = builder.build(0)?;
+        machine.fire(Trigger::Trig)?; // send to state2
+        assert_eq!(machine.state(), State::State2);
+        assert_eq!(*machine.object().lock().unwrap(), 0, "internal not fired");
+        machine.fire(Trigger::Trig)?; // re-enter to state2
+        assert_eq!(machine.state(), State::State2);
+        assert_eq!(*machine.object().lock().unwrap(), 1, "internal has fired");
+        Ok(())
+    }
+
+    #[test]
+    fn entry_action_does_not_fire_on_internal_transition() -> eyre::Result<()> {
+        let mut builder = StateMachineBuilder::<_, _, i32>::new(State::State1);
+        builder
+            .config(State::State1)
+            .permit(Trigger::Trig, State::State2);
+
+        builder
+            .config(State::State2)
+            .on_entry(|_t, o| *o += 1)
+            .internal_transition(Trigger::Trig, |_, _| ());
+
+        let mut machine = builder.build(0)?;
+        machine.fire(Trigger::Trig)?; // send to state2
+        assert_eq!(machine.state(), State::State2);
+        assert_eq!(*machine.object().lock().unwrap(), 1, "entry has fired");
+        machine.fire(Trigger::Trig)?; // re-enter to state2
+        assert_eq!(machine.state(), State::State2);
+        assert_eq!(*machine.object().lock().unwrap(), 1, "entry not fired");
         Ok(())
     }
 }

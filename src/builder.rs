@@ -11,56 +11,14 @@ use std::sync::Mutex;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+use crate::state_config::StateConfig;
+use crate::state_config::WrappedStateRep;
 use crate::state_machine::StateMachine;
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
 use crate::trigger_behaviour::TransitioningTriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
-
-type WrappedStateRep<S, T, O> = Rc<RefCell<StateRepresentation<S, T, O>>>;
-
-pub struct StateConfig<S, T, O> {
-    rep: WrappedStateRep<S, T, O>,
-}
-
-impl<S, T, O> StateConfig<S, T, O>
-where
-    S: Debug + Copy + Eq + Hash + 'static,
-    T: Debug + Copy + Eq + Hash + 'static,
-{
-    fn new(rep: WrappedStateRep<S, T, O>) -> Self {
-        Self { rep }
-    }
-
-    pub fn state(&self) -> S {
-        self.rep.borrow().state()
-    }
-
-    pub fn permit(self, trigger: T, destination_state: S) -> Self {
-        let behaviour = TransitioningTriggerBehaviour::new(trigger, destination_state);
-        self.rep
-            .borrow_mut()
-            .add_trigger_behaviour(trigger, behaviour);
-        self
-    }
-
-    pub fn on_entry<F>(self, f: F) -> Self
-    where
-        F: FnMut(&Transition<S, T>, &mut O) + 'static,
-    {
-        self.rep.borrow_mut().add_entry_action(f);
-        self
-    }
-
-    pub fn on_exit<F>(self, f: F) -> Self
-    where
-        F: FnMut(&Transition<S, T>, &mut O) + 'static,
-    {
-        self.rep.borrow_mut().add_exit_action(f);
-        self
-    }
-}
 
 fn unwrap_rc_and_refcell<R>(item: Rc<RefCell<R>>) -> Result<R, Rc<RefCell<R>>> {
     let unrc = Rc::try_unwrap(item)?;
@@ -155,17 +113,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, EnumIter)]
-    enum State {
-        State1,
-        State2,
-    }
-
-    #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-    enum Trigger {
-        Trig,
-    }
+    use crate::tests::{State, Trigger};
 
     #[test]
     fn check_all_states_are_configured_on_new() {

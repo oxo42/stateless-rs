@@ -19,9 +19,10 @@ pub struct StateRepresentation<S, T, O> {
     pub(crate) entry_actions: Vec<Action<S, T, O>>,
     #[derivative(Debug = "ignore")]
     pub(crate) exit_actions: Vec<Action<S, T, O>>,
+    #[derivative(Debug = "ignore")]
+    pub(crate) internal_actions: Vec<Action<S, T, O>>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
-    // internal_actions: Vec<()>,
     // substates: Vec<Self>,
 }
 
@@ -36,6 +37,7 @@ where
             trigger_behaviours: HashMap::new(),
             entry_actions: Vec::new(),
             exit_actions: Vec::new(),
+            internal_actions: Vec::new(),
         }
     }
 
@@ -65,14 +67,21 @@ where
         self.exit_actions.push(Box::new(f));
     }
 
+    pub fn add_internal_action<F>(&mut self, f: F)
+    where
+        F: FnMut(&Transition<S, T>, &mut O) + 'static,
+    {
+        self.internal_actions.push(Box::new(f));
+    }
+
     pub fn fire_trigger(&self, trigger: T) -> Result<S, StateMachineError<S, T>> {
-        match self.trigger_behaviours.get(&trigger) {
-            Some(b) => Ok(b.fire(self.state)),
-            None => Err(StateMachineError::TriggerNotPermitted {
+        let Some(behaviour) = self.trigger_behaviours.get(&trigger) else {
+            return Err(StateMachineError::TriggerNotPermitted {
                 state: self.state,
                 trigger,
-            }),
-        }
+            });
+        };
+        Ok(behaviour.fire(self.state))
     }
 
     pub fn enter(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
@@ -87,5 +96,25 @@ where
             let mut object = state_object.lock().unwrap();
             action(transition, &mut *object);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::{State, Trigger};
+
+    #[test]
+    fn unconfigured_trigger_errors() {
+        let rep = StateRepresentation::<_, _, ()>::new(State::State1);
+        let result = rep.fire_trigger(Trigger::Trig);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            StateMachineError::TriggerNotPermitted {
+                state: State::State1,
+                trigger: Trigger::Trig
+            }
+        );
     }
 }
