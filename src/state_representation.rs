@@ -8,7 +8,7 @@ use std::hash::Hash;
 use std::ops::FnOnce;
 use std::sync::{Arc, Mutex};
 
-type Action<S, T, O> = Box<dyn FnMut(&Transition<S, T>, Arc<Mutex<O>>)>;
+type Action<S, T, O> = Box<dyn FnMut(&Transition<S, T>, &mut O)>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -53,14 +53,14 @@ where
 
     pub fn add_entry_action<F>(&mut self, f: F)
     where
-        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+        F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
         self.entry_actions.push(Box::new(f));
     }
 
     pub fn add_exit_action<F>(&mut self, f: F)
     where
-        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+        F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
         self.exit_actions.push(Box::new(f));
     }
@@ -77,13 +77,15 @@ where
 
     pub fn enter(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
         for action in self.entry_actions.iter_mut() {
-            action(transition, Arc::clone(&state_object));
+            let mut object = state_object.lock().unwrap();
+            action(transition, &mut *object);
         }
     }
 
     pub fn exit(&mut self, transition: &Transition<S, T>, state_object: Arc<Mutex<O>>) {
         for action in self.exit_actions.iter_mut() {
-            action(transition, Arc::clone(&state_object));
+            let mut object = state_object.lock().unwrap();
+            action(transition, &mut *object);
         }
     }
 }

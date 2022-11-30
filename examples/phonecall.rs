@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 use std::{
     fmt::Display,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 
 ///! Example of using the statemachine to power a phonecall
@@ -36,9 +36,14 @@ enum State {
 }
 
 fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
-    // the commented lines are things I need to do to get feature parity with
+    // TODO: the commented lines are things I need to do to get feature parity with
+    // the PhoneCall.cs example in
     // https://github.com/dotnet-state-machine/stateless
-    let mut builder = StateMachineBuilder::new(State::OffHook);
+
+    // NB: Specifying the PhoneState type here is needed to infer the closure
+    // for on_entry and on_exit
+    let mut builder: StateMachineBuilder<_, _, PhoneState> =
+        StateMachineBuilder::new(State::OffHook);
     builder
         .config(State::OffHook)
         .permit(Trigger::CallDialed, State::Ringing);
@@ -50,16 +55,8 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
 
     builder
         .config(State::Connected)
-        .on_entry(|_transition, object| {
-            let mut data: MutexGuard<'_, PhoneState> = object.lock().unwrap();
-            (*data).call_start = Some(Instant::now());
-        })
-        .on_exit(|_transition, object| {
-            let mut data: MutexGuard<'_, PhoneState> = object.lock().unwrap();
-            let call_start = (*data).call_start.unwrap();
-            let duration = Instant::now().duration_since(call_start);
-            (*data).call_duration = Some(duration);
-        })
+        .on_entry(|_transition, object| object.start_call())
+        .on_exit(|_transition, object| object.end_call())
         // .internal_transition(Trigger::MuteMicrophone, |t| on_mute())
         // .internal_transition(Trigger::UnmuteMicrophone, |t| on_unmute())
         // .internal_transition(setVolumeTrigger, |volume, t| on_set_volume(t))
@@ -88,6 +85,17 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
 struct PhoneState {
     call_start: Option<Instant>,
     call_duration: Option<Duration>,
+}
+
+impl PhoneState {
+    fn start_call(&mut self) {
+        self.call_start = Some(Instant::now());
+    }
+
+    fn end_call(&mut self) {
+        let duration = Instant::now().duration_since(self.call_start.unwrap());
+        self.call_duration = Some(duration);
+    }
 }
 
 struct Phone {

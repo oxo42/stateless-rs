@@ -47,7 +47,7 @@ where
 
     pub fn on_entry<F>(self, f: F) -> Self
     where
-        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+        F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
         self.rep.borrow_mut().add_entry_action(f);
         self
@@ -55,7 +55,7 @@ where
 
     pub fn on_exit<F>(self, f: F) -> Self
     where
-        F: FnMut(&Transition<S, T>, Arc<Mutex<O>>) + 'static,
+        F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
         self.rep.borrow_mut().add_exit_action(f);
         self

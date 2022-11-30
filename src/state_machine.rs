@@ -159,7 +159,7 @@ mod tests {
             .permit(Trigger::Switch, State::On);
         builder
             .config(State::On)
-            .on_entry(move |_transition, obj| *obj.lock().unwrap() = true);
+            .on_entry(move |_transition, obj| *obj = true);
 
         let mut machine = builder.build(false)?;
 
@@ -179,12 +179,10 @@ mod tests {
         builder
             .config(State::On)
             .on_entry(move |_transition, object| {
-                let mut data = object.lock().unwrap();
-                *data += 1;
+                *object += 1;
             })
             .on_entry(move |_transition, object| {
-                let mut data = object.lock().unwrap();
-                *data += 2;
+                *object += 2;
             });
 
         let mut machine = builder.build(0)?;
@@ -204,12 +202,10 @@ mod tests {
         builder
             .config(State::Off)
             .on_exit(move |_transition, object| {
-                let mut data = object.lock().unwrap();
-                *data += 1;
+                *object += 1;
             })
             .on_exit(move |_transition, object| {
-                let mut data = object.lock().unwrap();
-                *data += 2;
+                *object += 2;
             })
             .permit(Trigger::Switch, State::On);
 
