@@ -18,7 +18,7 @@ use crate::TransitionEventHandler;
 /// This can only be built by a [`crate::StateMachineBuilder`].
 ///
 /// TODO:
-/// * Make thi thread safe
+/// * Make this thread safe
 ///
 /// ## State Object
 ///
@@ -40,7 +40,7 @@ where
     T: Copy + Eq + Hash + Debug,
     O: Debug,
 {
-    // Visible only to this crate
+    // Must create with StateMachineBuilder
     pub(crate) fn new(
         initial_state: S,
         state_representations: HashMap<S, StateRepresentation<S, T, O>>,
@@ -55,15 +55,42 @@ where
         }
     }
 
+    /// Pull out the object that went into the
+    /// [`crate::StateMachineBuilder.build`] as a [`std::sync::MutexGuard`]
+    ///
+    /// ## Example
+    /// ```
+    /// # use stateless_rs::StateMachineBuilder;
+    /// # #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, strum_macros::EnumIter)]
+    /// # enum State { On }
+    /// # #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+    /// # enum Trigger {
+    /// # }
+    /// # fn main() -> Result<(), stateless_rs::StateMachineError<State,Trigger>> {
+    /// let mut builder = StateMachineBuilder::<State, Trigger, i32>::new(State::On);
+    /// let machine = builder.build(42)?;
+    /// {
+    ///     let the_answer = *machine.object();
+    ///     println!("The answer is {the_answer}");
+    /// } // Mutex unlocked here
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn object(&self) -> MutexGuard<O> {
         let o = self.object.lock().unwrap();
         o
     }
 
+    /// Returns the current state of the state machine
     pub fn state(&self) -> S {
         self.current_state
     }
 
+    /// Fire a trigger.  Will return `()` on success and a
+    /// [`crate::StateMachineError`] on failure
+    ///
+    /// TODO
+    /// * Implement a queue and concurrent access
     pub fn fire(&mut self, trigger: T) -> Result<(), StateMachineError<S, T>> {
         // Set up queue
         self.fireone(trigger)

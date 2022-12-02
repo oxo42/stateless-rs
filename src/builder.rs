@@ -83,7 +83,8 @@ where
     /// let object = 42;
     /// let mut builder = StateMachineBuilder::<State, Trigger, i32>::new(State::On);
     /// let machine = builder.build(object)?;
-    /// let object = machine.object(); // Returns Arc<Mutex<i32>>
+    /// let object = machine.object(); // Returns MutexGuard<i32>
+    /// println!("{}", object);
     /// # Ok(())
     /// # }
     /// ```
