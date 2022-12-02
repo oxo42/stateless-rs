@@ -65,8 +65,7 @@ where
             let representation = self
                 .representation()
                 .expect("representations should all exist");
-            let behaviour = representation.get_behaviour(trigger)?;
-            behaviour
+            representation.get_behaviour(trigger)?
         };
         let transition = match behaviour {
             TriggerBehaviour::Transitioning(b) => {

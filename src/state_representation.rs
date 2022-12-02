@@ -77,12 +77,12 @@ where
         &self,
         trigger: T,
     ) -> Result<TriggerBehaviour<S, T>, StateMachineError<S, T>> {
-        let b = self.trigger_behaviours.get(&trigger).ok_or_else(|| {
+        let b = self.trigger_behaviours.get(&trigger).ok_or(
             StateMachineError::TriggerNotPermitted {
                 state: self.state,
                 trigger,
-            }
-        })?;
+            },
+        )?;
         Ok(b.clone())
     }
 

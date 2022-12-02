@@ -82,9 +82,26 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
 }
 
 #[derive(Debug)]
+enum Mic {
+    Muted,
+    Unmuted,
+}
+
+#[derive(Debug)]
 struct PhoneState {
     call_start: Option<Instant>,
     call_duration: Option<Duration>,
+    mic: Mic,
+}
+
+impl Default for PhoneState {
+    fn default() -> Self {
+        Self {
+            call_start: None,
+            call_duration: None,
+            mic: Mic::Unmuted,
+        }
+    }
 }
 
 impl PhoneState {
@@ -98,10 +115,12 @@ impl PhoneState {
     }
 
     fn mute(&mut self) {
+        self.mic = Mic::Muted;
         println!("Muting");
     }
 
     fn unmute(&mut self) {
+        self.mic = Mic::Unmuted;
         println!("Unmuting");
     }
 }
@@ -118,10 +137,7 @@ impl Display for Phone {
 
 impl Phone {
     fn new() -> eyre::Result<Self> {
-        let state = PhoneState {
-            call_start: None,
-            call_duration: None,
-        };
+        let state = PhoneState::default();
         Ok(Self {
             statemachine: build_statemachine(state)?,
         })
