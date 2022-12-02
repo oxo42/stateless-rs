@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::MutexGuard;
 
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
@@ -12,6 +13,19 @@ use crate::trigger_behaviour::TriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
 
+/// A finite state machine which holds a state object.
+///
+/// This can only be built by a [`crate::StateMachineBuilder`].
+///
+/// TODO:
+/// * Make thi thread safe
+///
+/// ## State Object
+///
+/// Whatever you want to put into the state machine.  This will be wrapped
+/// inside a [`std::sync::Mutex`].  If you want to pull it out you will need to
+/// call `.object()` which will return a [`std::sync::MutexGuard`] and will need
+/// to be dereferenced
 #[derive(Debug)]
 pub struct StateMachine<S, T, O> {
     current_state: S,
@@ -41,9 +55,11 @@ where
         }
     }
 
-    pub fn object(&self) -> Arc<Mutex<O>> {
-        Arc::clone(&self.object)
+    pub fn object(&self) -> MutexGuard<O> {
+        let o = self.object.lock().unwrap();
+        o
     }
+
     pub fn state(&self) -> S {
         self.current_state
     }
@@ -166,7 +182,7 @@ mod tests {
         assert_eq!(machine.state(), State::State1);
         machine.fire(Trigger::Trig)?;
         assert_eq!(machine.state(), State::State2);
-        assert!(*machine.object().lock().unwrap());
+        assert!(*machine.object());
         Ok(())
     }
 
@@ -187,12 +203,10 @@ mod tests {
 
         let mut machine = builder.build(0)?;
 
-        let count = machine.object();
-
         assert_eq!(machine.state(), State::State1);
         machine.fire(Trigger::Trig)?;
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*count.lock().unwrap(), 3);
+        assert_eq!(*machine.object(), 3);
         Ok(())
     }
 
@@ -211,12 +225,10 @@ mod tests {
 
         let mut machine = builder.build(0)?;
 
-        let count = machine.object();
-
         assert_eq!(machine.state(), State::State1);
         machine.fire(Trigger::Trig)?;
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*count.lock().unwrap(), 3);
+        assert_eq!(*machine.object(), 3);
         Ok(())
     }
 
@@ -252,7 +264,7 @@ mod tests {
         let mut machine = builder.build(0)?;
         machine.fire(Trigger::Trig)?;
 
-        assert_eq!(*machine.object().lock().unwrap(), 1);
+        assert_eq!(*machine.object(), 1);
         Ok(())
     }
 
@@ -270,10 +282,10 @@ mod tests {
         let mut machine = builder.build(0)?;
         machine.fire(Trigger::Trig)?; // send to state2
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*machine.object().lock().unwrap(), 0, "internal not fired");
+        assert_eq!(*machine.object(), 0, "internal not fired");
         machine.fire(Trigger::Trig)?; // re-enter to state2
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*machine.object().lock().unwrap(), 1, "internal has fired");
+        assert_eq!(*machine.object(), 1, "internal has fired");
         Ok(())
     }
 
@@ -292,10 +304,10 @@ mod tests {
         let mut machine = builder.build(0)?;
         machine.fire(Trigger::Trig)?; // send to state2
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*machine.object().lock().unwrap(), 1, "entry has fired");
+        assert_eq!(*machine.object(), 1, "entry has fired");
         machine.fire(Trigger::Trig)?; // re-enter to state2
         assert_eq!(machine.state(), State::State2);
-        assert_eq!(*machine.object().lock().unwrap(), 1, "entry not fired");
+        assert_eq!(*machine.object(), 1, "entry not fired");
         Ok(())
     }
 }

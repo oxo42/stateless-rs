@@ -1,8 +1,6 @@
+use std::fmt::Display;
+use std::sync::MutexGuard;
 use std::time::{Duration, Instant};
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex},
-};
 
 ///! Example of using the statemachine to power a phonecall
 use stateless_rs::{StateMachine, StateMachineBuilder};
@@ -131,7 +129,7 @@ struct Phone {
 
 impl Display for Phone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Phone: {:?}", self.statemachine.object().lock().unwrap())
+        write!(f, "Phone: {:?}", self.statemachine.object())
     }
 }
 
@@ -143,7 +141,7 @@ impl Phone {
         })
     }
 
-    fn state(&self) -> Arc<Mutex<PhoneState>> {
+    fn state(&self) -> MutexGuard<PhoneState> {
         self.statemachine.object()
     }
 
@@ -171,7 +169,7 @@ impl Phone {
     }
 
     fn call_duration(&self) -> Duration {
-        let duration = self.state().lock().unwrap().call_duration;
+        let duration = self.state().call_duration;
         duration.unwrap_or(Duration::default())
     }
 }
@@ -180,9 +178,7 @@ fn main() -> eyre::Result<()> {
     let mut phone = Phone::new()?;
     println!("Phone: {}", phone);
     phone.call()?;
-    println!("\n");
     phone.mute_mic()?;
-    println!("\n");
     phone.unmute_mic()?;
     println!("Phone: {}", phone);
     phone.hangup()?;
