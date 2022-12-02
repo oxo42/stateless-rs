@@ -8,7 +8,6 @@ use std::sync::Mutex;
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
 use crate::transition_event;
-use crate::trigger_behaviour::TrigBehaviour;
 use crate::trigger_behaviour::TriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
@@ -70,7 +69,7 @@ where
             behaviour
         };
         let transition = match behaviour {
-            TrigBehaviour::Transitioning(b) => {
+            TriggerBehaviour::Transitioning(b) => {
                 let representation = self
                     .representation()
                     .expect("representations should all exist");
@@ -84,7 +83,7 @@ where
                 representation.enter(&transition, state_object);
                 transition
             }
-            TrigBehaviour::Internal(b) => {
+            TriggerBehaviour::Internal(b) => {
                 b.fire(current_state); // TODO: does nothing now. Maybe needed for parameters
                 let representation = self
                     .representation()
@@ -92,7 +91,6 @@ where
                 let transition = Transition::new(current_state, trigger, current_state);
                 representation.fire_internal_actions(&transition, Arc::clone(&state_object));
                 transition
-
             }
         };
 

@@ -14,9 +14,9 @@ use strum_macros::EnumIter;
 use crate::state_machine::StateMachine;
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
-use crate::trigger_behaviour::InternalTransitioningTriggerBehaviour;
-use crate::trigger_behaviour::TransitioningTriggerBehaviour;
-use crate::trigger_behaviour::TrigBehaviour;
+use crate::trigger_behaviour::Internal;
+use crate::trigger_behaviour::Transitioning;
+use crate::trigger_behaviour::TriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
 
@@ -40,10 +40,8 @@ where
     }
 
     pub fn permit(self, trigger: T, destination_state: S) -> Self {
-        let behaviour = TrigBehaviour::Transitioning(TransitioningTriggerBehaviour::new(
-            trigger,
-            destination_state,
-        ));
+        let behaviour =
+            TriggerBehaviour::Transitioning(Transitioning::new(trigger, destination_state));
         self.rep
             .borrow_mut()
             .add_trigger_behaviour(trigger, behaviour);
@@ -54,8 +52,7 @@ where
     where
         F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
-        let behaviour =
-            TrigBehaviour::Internal(InternalTransitioningTriggerBehaviour::new(trigger));
+        let behaviour = TriggerBehaviour::Internal(Internal::new(trigger));
         {
             let mut rep = self.rep.borrow_mut();
             rep.add_trigger_behaviour(trigger, behaviour);

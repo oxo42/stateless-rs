@@ -1,5 +1,5 @@
 use crate::transition::Transition;
-use crate::trigger_behaviour::{TrigBehaviour, TriggerBehaviour};
+use crate::trigger_behaviour::TriggerBehaviour;
 use crate::StateMachineError;
 use derivative::Derivative;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ type Action<S, T, O> = Box<dyn FnMut(&Transition<S, T>, &mut O)>;
 #[derivative(Debug)]
 pub struct StateRepresentation<S, T, O> {
     state: S,
-    trigger_behaviours: HashMap<T, TrigBehaviour<S, T>>,
+    trigger_behaviours: HashMap<T, TriggerBehaviour<S, T>>,
     #[derivative(Debug = "ignore")]
     pub(crate) entry_actions: Vec<Action<S, T, O>>,
     #[derivative(Debug = "ignore")]
@@ -45,7 +45,7 @@ where
         self.state
     }
 
-    pub(crate) fn add_trigger_behaviour(&mut self, trigger: T, behaviour: TrigBehaviour<S, T>) {
+    pub(crate) fn add_trigger_behaviour(&mut self, trigger: T, behaviour: TriggerBehaviour<S, T>) {
         self.trigger_behaviours.insert(trigger, behaviour);
     }
 
@@ -73,7 +73,7 @@ where
     pub(crate) fn get_behaviour(
         &self,
         trigger: T,
-    ) -> Result<TrigBehaviour<S, T>, StateMachineError<S, T>> {
+    ) -> Result<TriggerBehaviour<S, T>, StateMachineError<S, T>> {
         let b = self.trigger_behaviours.get(&trigger).ok_or_else(|| {
             StateMachineError::TriggerNotPermitted {
                 state: self.state,

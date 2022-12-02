@@ -16,7 +16,6 @@ use crate::state_config::WrappedStateRep;
 use crate::state_machine::StateMachine;
 use crate::state_representation::StateRepresentation;
 use crate::transition::Transition;
-use crate::trigger_behaviour::TransitioningTriggerBehaviour;
 use crate::StateMachineError;
 use crate::TransitionEventHandler;
 
