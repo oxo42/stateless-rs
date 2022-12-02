@@ -55,10 +55,10 @@ fn build_statemachine(state: PhoneState) -> eyre::Result<PhoneStateMachine> {
 
     builder
         .config(State::Connected)
-        .on_entry(|_transition, object| object.start_call())
-        .on_exit(|_transition, object| object.end_call())
-        // .internal_transition(Trigger::MuteMicrophone, |t| on_mute())
-        // .internal_transition(Trigger::UnmuteMicrophone, |t| on_unmute())
+        .on_entry(|_, object| object.start_call())
+        .on_exit(|_, object| object.end_call())
+        .internal_transition(Trigger::MuteMicrophone, |_, o| o.mute())
+        .internal_transition(Trigger::UnmuteMicrophone, |_, o| o.unmute())
         // .internal_transition(setVolumeTrigger, |volume, t| on_set_volume(t))
         .permit(Trigger::LeftMessage, State::OffHook)
         .permit(Trigger::PlacedOnHold, State::OnHold);
@@ -96,6 +96,14 @@ impl PhoneState {
         let duration = Instant::now().duration_since(self.call_start.unwrap());
         self.call_duration = Some(duration);
     }
+
+    fn mute(&mut self) {
+        println!("Muting");
+    }
+
+    fn unmute(&mut self) {
+        println!("Unmuting");
+    }
 }
 
 struct Phone {
@@ -130,6 +138,16 @@ impl Phone {
         Ok(())
     }
 
+    fn mute_mic(&mut self) -> eyre::Result<()> {
+        self.statemachine.fire(Trigger::MuteMicrophone)?;
+        Ok(())
+    }
+
+    fn unmute_mic(&mut self) -> eyre::Result<()> {
+        self.statemachine.fire(Trigger::UnmuteMicrophone)?;
+        Ok(())
+    }
+
     fn hangup(&mut self) -> eyre::Result<()> {
         self.statemachine.fire(Trigger::LeftMessage)?;
         println!("State: {:?}", self.statemachine.state());
@@ -146,6 +164,10 @@ fn main() -> eyre::Result<()> {
     let mut phone = Phone::new()?;
     println!("Phone: {}", phone);
     phone.call()?;
+    println!("\n");
+    phone.mute_mic()?;
+    println!("\n");
+    phone.unmute_mic()?;
     println!("Phone: {}", phone);
     phone.hangup()?;
     println!("Phone: {}", phone);

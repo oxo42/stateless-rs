@@ -56,7 +56,7 @@ where
         {
             let mut rep = self.rep.borrow_mut();
             rep.add_trigger_behaviour(trigger, behaviour);
-            rep.add_internal_action(internal_action);
+            rep.add_internal_action(trigger, internal_action);
         }
         self
     }

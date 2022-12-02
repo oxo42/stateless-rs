@@ -20,7 +20,7 @@ pub struct StateRepresentation<S, T, O> {
     #[derivative(Debug = "ignore")]
     pub(crate) exit_actions: Vec<Action<S, T, O>>,
     #[derivative(Debug = "ignore")]
-    pub(crate) internal_actions: Vec<Action<S, T, O>>,
+    pub(crate) internal_actions: HashMap<T, Vec<Action<S, T, O>>>,
     // activate_actions: Vec<()>,
     // deactivate_actions: Vec<()>,
     // substates: Vec<Self>,
@@ -37,7 +37,7 @@ where
             trigger_behaviours: HashMap::new(),
             entry_actions: Vec::new(),
             exit_actions: Vec::new(),
-            internal_actions: Vec::new(),
+            internal_actions: HashMap::new(),
         }
     }
 
@@ -63,11 +63,14 @@ where
         self.exit_actions.push(Box::new(f));
     }
 
-    pub fn add_internal_action<F>(&mut self, f: F)
+    pub fn add_internal_action<F>(&mut self, trigger: T, f: F)
     where
         F: FnMut(&Transition<S, T>, &mut O) + 'static,
     {
-        self.internal_actions.push(Box::new(f));
+        self.internal_actions
+            .entry(trigger)
+            .or_default()
+            .push(Box::new(f));
     }
 
     pub(crate) fn get_behaviour(
@@ -102,7 +105,10 @@ where
         transition: &Transition<S, T>,
         state_object: Arc<Mutex<O>>,
     ) {
-        for action in self.internal_actions.iter_mut() {
+        let Some(actions) = self.internal_actions.get_mut(&transition.trigger) else {
+            return;
+        };
+        for action in actions.iter_mut() {
             let mut object = state_object.lock().unwrap();
             action(transition, &mut *object);
         }
@@ -112,7 +118,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{State, Trigger};
+    use crate::{
+        tests::{State, Trigger},
+        transition,
+    };
 
     #[test]
     fn unconfigured_trigger_errors() {
@@ -126,5 +135,40 @@ mod tests {
                 trigger: Trigger::Trig
             }
         );
+    }
+
+    #[test]
+    fn internal_actions_fire_for_correct_trigger() -> eyre::Result<()> {
+        let trig_fired = Arc::new(Mutex::new(false));
+        let trig_fired_clone = Arc::clone(&trig_fired);
+        let state = Arc::new(Mutex::new(()));
+        let mut rep = StateRepresentation::<_, _, ()>::new(State::State1);
+        rep.add_internal_action(Trigger::Trig, move |_, _| {
+            *trig_fired_clone.lock().unwrap() = true
+        });
+        rep.add_internal_action(Trigger::Trig2, |_, _| panic!("trig2 should not have fired"));
+        rep.fire_internal_actions(
+            &Transition::new(State::State1, Trigger::Trig, State::State1),
+            Arc::clone(&state),
+        );
+        assert!(*trig_fired.lock().unwrap(), "trig should have fired");
+        Ok(())
+    }
+
+    #[test]
+    fn multiple_internal_actions_fire() -> eyre::Result<()> {
+        let count = Arc::new(Mutex::new(0));
+        let c1 = Arc::clone(&count);
+        let c2 = Arc::clone(&count);
+        let state = Arc::new(Mutex::new(()));
+        let mut rep = StateRepresentation::<_, _, ()>::new(State::State1);
+        rep.add_internal_action(Trigger::Trig, move |_, _| *c1.lock().unwrap() += 1);
+        rep.add_internal_action(Trigger::Trig, move |_, _| *c2.lock().unwrap() += 1);
+        rep.fire_internal_actions(
+            &Transition::new(State::State1, Trigger::Trig, State::State1),
+            Arc::clone(&state),
+        );
+        assert_eq!(*count.lock().unwrap(), 2, "trig should have fired twice");
+        Ok(())
     }
 }
